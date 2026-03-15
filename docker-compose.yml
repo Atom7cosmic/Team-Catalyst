@@ -1,0 +1,88 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5001}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-http://localhost:5001}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - orgos-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - PORT=5001
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/orgos}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - CHROMA_HOST=${CHROMA_HOST:-chroma}
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/models/whisper:/app/models/whisper
+      - whisper-cache:/app/whisper-cache
+    depends_on:
+      - mongo
+      - redis
+      - chroma
+    networks:
+      - orgos-network
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - orgos-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - orgos-network
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - orgos-network
+
+volumes:
+  mongo_data:
+  redis_data:
+  chroma_data:
+  whisper-cache:
+
+networks:
+  orgos-network:
+    driver: bridge
